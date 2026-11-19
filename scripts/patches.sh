@@ -413,7 +413,7 @@ PYEOF
 # ------------------------------------------------- stpcpy implementation ---
 # clang turns sprintf(p, "%s", s) into a stpcpy() call, but 4.14's lib/string.c
 # has no stpcpy -> ld.lld "undefined symbol: stpcpy" at vmlinux link. Add a
-# simple implementation as a safety net (KCFLAGS -fno-builtin-stpcpy also set).
+# simple implementation as a safety net for clang sprintf->stpcpy optimization.
 fix_stpcpy() {
 	group "Ensure stpcpy() is available"
 	local sc="${KERNEL_DIR}/lib/string.c"
