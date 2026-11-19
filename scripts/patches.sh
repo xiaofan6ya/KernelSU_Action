@@ -389,7 +389,6 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 		kpm)          kpm_patch_image "$2" ;;
 		all)
 			# clang 14 + AOSP GCC 4.9 as syntax mismatch on 4.14: use integrated as
-			disable_no_integrated_as
 
 			# Order matters and this is the tested one (4.19 + SukiSU builtin
 			# + SUSFS 1.5.5, no rejects):
