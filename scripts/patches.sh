@@ -382,12 +382,25 @@ fix_may_mount_decl() {
 import sys
 p = sys.argv[1]
 s = open(p, encoding='utf-8', errors='ignore').read()
-decl = 'static inline bool may_mount(void);\n\t'
-needle = 'if (!may_mount())'
-i = s.find(needle)
-if i >= 0 and 'static inline bool may_mount(void);' not in s[:i]:
-    s = s[:i] + decl + s[i:]
-    open(p, 'w', encoding='utf-8').write(s)
+decl_line = 'static inline bool may_mount(void);'
+if 'may_mount()' not in s:
+    sys.exit(0)
+if decl_line in s:
+    sys.exit(0)
+# Insert at file scope: right after the local #include block, before first
+# function. Using the last top-level #include as anchor keeps it outside any
+# function body (a static decl inside a block is illegal in C).
+lines = s.split('\n')
+insert_at = None
+# Only scan the first 60 lines (the header/include block) so the declaration
+# always lands at file scope, never inside a function body.
+for i, line in enumerate(lines[:60]):
+    if line.startswith('#include'):
+        insert_at = i + 1
+if insert_at is None:
+    insert_at = 0
+lines.insert(insert_at, decl_line)
+open(p, 'w', encoding='utf-8').write('\n'.join(lines))
 PYEOF
 	if grep -qE 'static (inline )?bool may_mount\(void\);' "$ns" 2>/dev/null; then
 		ok "inserted may_mount() forward declaration"
