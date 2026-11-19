@@ -410,6 +410,34 @@ PYEOF
 	endgroup
 }
 
+# ------------------------------------------------- stpcpy implementation ---
+# clang turns sprintf(p, "%s", s) into a stpcpy() call, but 4.14's lib/string.c
+# has no stpcpy -> ld.lld "undefined symbol: stpcpy" at vmlinux link. Add a
+# simple implementation as a safety net (KCFLAGS -fno-builtin-stpcpy also set).
+fix_stpcpy() {
+	group "Ensure stpcpy() is available"
+	local sc="${KERNEL_DIR}/lib/string.c"
+	[ -f "$sc" ] || { warn "lib/string.c not found"; endgroup; return 0; }
+	if grep -qE 'char \*stpcpy\(' "$sc" 2>/dev/null; then
+		info "stpcpy already present; skip"
+		endgroup; return 0
+	fi
+	cat >>"$sc" <<'EOF'
+
+#ifndef CONFIG_NO_STPCPY_FALLBACK
+char *stpcpy(char *dest, const char *src)
+{
+	while ((*dest++ = *src++) != '\0')
+		;
+	return dest - 1;
+}
+EXPORT_SYMBOL(stpcpy);
+#endif
+EOF
+	ok "appended stpcpy() implementation to lib/string.c"
+	endgroup
+}
+
 # ------------------------------------------------- missing cust.dtsi stub ---
 # Xiaomi's MT6893 source references <k6891v1_64/cust.dtsi> which is generated
 # by their internal build and absent from the OSS tree. We only need the kernel
@@ -463,6 +491,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 		all)
 			# MT6893 OSS tree lacks generated cust.dtsi -- stub it for dtbs build
 			fix_missing_cust_dtsi
+			# clang sprintf->stpcpy optimization needs a fallback symbol
+			fix_stpcpy
 
 			# Order matters and this is the tested one (4.19 + SukiSU builtin
 			# + SUSFS 1.5.5, no rejects):
