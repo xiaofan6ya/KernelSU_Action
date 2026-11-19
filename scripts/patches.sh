@@ -361,6 +361,23 @@ kpm_patch_image() {
 	endgroup
 }
 
+# ------------------------------------------------- integrated assembler ----
+# Legacy MTK 4.14 kernels hardcode `-no-integrated-as`, forcing clang to call
+# the AOSP GCC 4.9 `as`, which cannot parse the quoted .file directives that
+# clang 14 emits -> "junk at end of line". Let clang use its own integrated
+# assembler instead by removing that flag from the top-level Makefile.
+disable_no_integrated_as() {
+	group "Enable clang integrated assembler"
+	local mk="${KERNEL_DIR}/Makefile"
+	if grep -q '^CLANG_FLAGS[[:space:]]*+=[^#]*-no-integrated-as' "$mk" 2>/dev/null; then
+		sed -i 's/[[:space:]]*-no-integrated-as//' "$mk"
+		ok "removed -no-integrated-as from Makefile"
+	else
+		info "-no-integrated-as not present (already integrated); skip"
+	fi
+	endgroup
+}
+
 # --------------------------------------------------------------------- main ---
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
@@ -371,6 +388,9 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 		hooks)        hooks_patch_apply ;;
 		kpm)          kpm_patch_image "$2" ;;
 		all)
+			# clang 14 + AOSP GCC 4.9 as syntax mismatch on 4.14: use integrated as
+			disable_no_integrated_as
+
 			# Order matters and this is the tested one (4.19 + SukiSU builtin
 			# + SUSFS 1.5.5, no rejects):
 			#   path_umount and the hook patches both key off textual anchors
