@@ -425,6 +425,12 @@ fix_missing_cust_dtsi() {
 	mkdir -p "$dir"
 	printf '/* stub: generated cust.dtsi not shipped in OSS kernel */\n' >"$f"
 	ok "created stub $f"
+	# The <angled> include won't search this dir; comment it out in the dtsi.
+	local common="${KERNEL_DIR}/arch/arm64/boot/dts/mediatek/xiaomi-mt6891-common.dtsi"
+	if [ -f "$common" ]; then
+		sed -i 's|^#include <k6891v1_64/cust.dtsi>|/* #include <k6891v1_64/cust.dtsi> -- stubbed */|' "$common"
+		ok "commented out cust.dtsi include in xiaomi-mt6891-common.dtsi"
+	fi
 	endgroup
 }
 
