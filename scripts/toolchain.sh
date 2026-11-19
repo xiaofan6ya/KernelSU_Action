@@ -130,8 +130,13 @@ setup_gcc() {
 				base=$(basename "$f")
 				alias="aarch64-linux-gnu-${base#aarch64-linux-android-}"
 				[ -e "${GCC64_DIR}/bin/${alias}" ] || ln -sf "$(basename "$f")" "${GCC64_DIR}/bin/${alias}"
+				# build.sh only prepends CLANG_DIR/bin to PATH; place the alias
+				# there too so the external assembler resolves during -no-integrated-as.
+				if [ -d "${CLANG_DIR}/bin" ]; then
+					ln -sf "${GCC64_DIR}/bin/${base}" "${CLANG_DIR}/bin/${alias}" 2>/dev/null || true
+				fi
 			done
-			ok "created aarch64-linux-gnu-* binutils aliases"
+			ok "created aarch64-linux-gnu-* binutils aliases (gcc bin + clang bin)"
 		fi
 		export_env GCC_64 "CROSS_COMPILE=${GCC64_DIR}/bin/aarch64-linux-android-"
 		endgroup
