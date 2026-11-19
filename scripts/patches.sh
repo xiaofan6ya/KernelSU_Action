@@ -410,6 +410,24 @@ PYEOF
 	endgroup
 }
 
+# ------------------------------------------------- missing cust.dtsi stub ---
+# Xiaomi's MT6893 source references <k6891v1_64/cust.dtsi> which is generated
+# by their internal build and absent from the OSS tree. We only need the kernel
+# Image (DTB comes from stock), so create a minimal stub so dtbs target builds.
+fix_missing_cust_dtsi() {
+	group "Stub missing k6891v1_64/cust.dtsi"
+	local dir="${KERNEL_DIR}/arch/arm64/boot/dts/mediatek/k6891v1_64"
+	local f="${dir}/cust.dtsi"
+	if [ -f "$f" ]; then
+		info "cust.dtsi already present; skip"
+		endgroup; return 0
+	fi
+	mkdir -p "$dir"
+	printf '/* stub: generated cust.dtsi not shipped in OSS kernel */\n' >"$f"
+	ok "created stub $f"
+	endgroup
+}
+
 # ------------------------------------------------- integrated assembler ----
 # Legacy MTK 4.14 kernels hardcode `-no-integrated-as`, forcing clang to call
 # the AOSP GCC 4.9 `as`, which cannot parse the quoted .file directives that
@@ -437,7 +455,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 		hooks)        hooks_patch_apply ;;
 		kpm)          kpm_patch_image "$2" ;;
 		all)
-			# clang 14 + AOSP GCC 4.9 as syntax mismatch on 4.14: use integrated as
+			# MT6893 OSS tree lacks generated cust.dtsi -- stub it for dtbs build
+			fix_missing_cust_dtsi
 
 			# Order matters and this is the tested one (4.19 + SukiSU builtin
 			# + SUSFS 1.5.5, no rejects):
