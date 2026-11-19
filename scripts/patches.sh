@@ -361,6 +361,42 @@ kpm_patch_image() {
 	endgroup
 }
 
+# ------------------------------------------------- may_mount forward decl ---
+# SUSFS builtin injects a may_mount() call near the top of fs/namespace.c but
+# places its static definition much lower; 4.14 kernels have no may_mount()
+# prototype, so clang errors "implicit declaration". Add a forward declaration
+# right before the first call so the later static definition stays valid.
+fix_may_mount_decl() {
+	group "Add may_mount() forward declaration"
+	local ns="${KERNEL_DIR}/fs/namespace.c"
+	if ! grep -q 'may_mount()' "$ns" 2>/dev/null; then
+		info "no may_mount() usage; skip"
+		endgroup; return 0
+	fi
+	if grep -qE 'static (inline )?bool may_mount\(void\);' "$ns" 2>/dev/null; then
+		info "forward declaration already present; skip"
+		endgroup; return 0
+	fi
+	# Insert declaration immediately before the first if(!may_mount()) call.
+	python3 - "$ns" <<'PYEOF'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8', errors='ignore').read()
+decl = 'static inline bool may_mount(void);\n\t'
+needle = 'if (!may_mount())'
+i = s.find(needle)
+if i >= 0 and 'static inline bool may_mount(void);' not in s[:i]:
+    s = s[:i] + decl + s[i:]
+    open(p, 'w', encoding='utf-8').write(s)
+PYEOF
+	if grep -qE 'static (inline )?bool may_mount\(void\);' "$ns" 2>/dev/null; then
+		ok "inserted may_mount() forward declaration"
+	else
+		warn "could not insert may_mount forward declaration"
+	fi
+	endgroup
+}
+
 # ------------------------------------------------- integrated assembler ----
 # Legacy MTK 4.14 kernels hardcode `-no-integrated-as`, forcing clang to call
 # the AOSP GCC 4.9 `as`, which cannot parse the quoted .file directives that
@@ -405,6 +441,8 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 			fi
 
 			if is_true "${ENABLE_SUSFS:-false}";      then susfs_apply;      fi
+			# 4.14 + SUSFS builtin: may_mount() used before its static definition
+			fix_may_mount_decl
 			if is_true "${ENABLE_HIDE_STUFF:-false}"; then hide_stuff_apply; fi
 			;;
 		*) die "unknown patch step '$1'" ;;
