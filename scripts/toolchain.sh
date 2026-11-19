@@ -121,6 +121,18 @@ setup_gcc() {
 		fetch "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/${gcc_tag}.tar.gz" \
 			"${WORKSPACE}/gcc-aarch64.tar.gz"
 		extract_archive "${WORKSPACE}/gcc-aarch64.tar.gz" "$GCC64_DIR"
+		# Some legacy kernels (e.g. MT6893 4.14) reject an Android --target but
+		# still need external binutils; expose gnu-prefixed aliases to the same
+		# AOSP binaries so CLANG_TRIPLE=aarch64-linux-gnu- resolves locally.
+		if [ -d "${GCC64_DIR}/bin" ]; then
+			for f in "${GCC64_DIR}"/bin/aarch64-linux-android-*; do
+				[ -e "$f" ] || continue
+				base=$(basename "$f")
+				alias="aarch64-linux-gnu-${base#aarch64-linux-android-}"
+				[ -e "${GCC64_DIR}/bin/${alias}" ] || ln -sf "$(basename "$f")" "${GCC64_DIR}/bin/${alias}"
+			done
+			ok "created aarch64-linux-gnu-* binutils aliases"
+		fi
 		export_env GCC_64 "CROSS_COMPILE=${GCC64_DIR}/bin/aarch64-linux-android-"
 		endgroup
 	fi
